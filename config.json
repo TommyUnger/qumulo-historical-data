@@ -1,0 +1,9 @@
+{"sqlite_directory": "./data/",
+    "clusters":[
+    {
+        "cluster": "{qumulo cluster}",
+        "user": "{qumulo api user}",
+        "pass": "{qumulo api password}"
+    }
+    ]
+}

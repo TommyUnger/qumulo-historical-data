@@ -87,3 +87,7 @@ ENV/
 
 # Rope project settings
 .ropeproject
+
+# qumulo data and logs
+data/
+log*.txt
