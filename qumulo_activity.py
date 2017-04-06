@@ -48,15 +48,20 @@ def main():
     with open(config_file) as data_file:
         config = json.load(data_file)
 
-    if cmd == 'add_cron':
+    db_path = config['sqlite_directory']
+    if config['sqlite_directory'][0] == '.':
+        db_path = working_directory + '/' + config['sqlite_directory']
+
+    if cmd == 'create_db':
+        for cluster in config['clusters']:
+            q_activity = QumuloActivitySqlite(cluster, db_path)
+            q_activity.create_db()
+    elif cmd == 'add_cron':
         print("Add data pull to crontab. Will run every 2 minutes.")
         setup_cron()
     elif cmd == 'get_data':
         print("Pulling data at time: %s" % (time.strftime("%Y-%m-%d %H:%M:%S"),))
         for cluster in config['clusters']:
-            db_path = config['sqlite_directory']
-            if config['sqlite_directory'][0] == '.':
-                db_path = working_directory + '/' + config['sqlite_directory']
             q_activity = QumuloActivitySqlite(cluster, db_path)
             q_activity.create_db()
             start_time = time.time()
@@ -65,7 +70,13 @@ def main():
             for i, entry in enumerate(activity['data']):
                 if entry['id'] in activity['inode_paths']:
                     NodeHelper.add_path_and_data_to_tree(tree, activity['inode_paths'][entry['id']].split('/'), entry)
-            q_activity.process_data(tree)
+            q_activity.process_path_data(tree)
+            tree = Node({'name':'/'})
+            for i, entry in enumerate(activity['data']):
+                if entry['id'] in activity['inode_paths']:
+                    parts = ['', entry['ip']] + activity['inode_paths'][entry['id']].split('/')[1:]
+                    NodeHelper.add_path_and_data_to_tree(tree, parts, entry)
+            q_activity.process_client_ip_data(tree)
             print("%5s seconds for: %s" % (round(time.time() - start_time, 2), cluster['cluster']))
 
 

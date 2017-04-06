@@ -70,8 +70,7 @@ class NodeHelper(object):
             data["read_iops"] = int(node.get_data("metadata-iops-read") + node.get_data("file-iops-read"))
             data["write_iops"] = int(node.get_data("metadata-iops-write") + node.get_data("file-iops-write"))
             data["total_iops"] = data["read_iops"] + data["write_iops"]
-            if (data["total_data"] > 100 or data["total_iops"] > 1) \
-                    and node.get_data("metadata-iops-read") + node.get_data("metadata-iops-write") > 0:
+            if (data["total_data"] > 10000 or data["total_iops"] > 5):
                 yield data
         for name,child in node.children.iteritems():
             if level < max_level:
