@@ -1,33 +1,21 @@
-import os
-import re
-import ssl
-import math
-import time
 import sqlite3
+import math
+import re
+import time
 from collections import OrderedDict
-from qumulo.rest_client import RestClient
-from qumulo_activity_tree import NodeHelper
-
-ssl._create_default_https_context = ssl._create_unverified_context
-
-class QumuloActivitySqlite(object):
-    rc = None
-    cluster = None
-    db_path = None
-
-    def __init__(self, cluster, db_path):
-        self.cluster = cluster
-        self.db_path = db_path
-        self.rc = RestClient(cluster['cluster'], 8000)
-        self.rc.login(cluster['user'], cluster['pass'])
+from activity_tree import NodeHelper
 
 
-    def get_db(self):
-        return '%s/qumulo-hourly-activity-%s.db' % (self.db_path, self.cluster['cluster'])
+class ApiActivity(object):
+    db = None
+
+    def __init__(self, db):
+        self.db = db
 
 
+    # api wrappers
     def get_activity(self):
-        activity = self.rc.analytics.current_activity_get()
+        activity = self.db.rc.analytics.current_activity_get()
 
         inode_ids = {}
         for entry in activity['entries']:
@@ -41,7 +29,7 @@ class QumuloActivitySqlite(object):
         found_count = 0
         inode_paths = {}
         while len(inode_ids) > 0:
-            path_ids = self.rc.fs.resolve_paths(inode_ids[:400])
+            path_ids = self.db.rc.fs.resolve_paths(inode_ids[:400])
             for inode_path in path_ids:
                 inode_paths[inode_path['id']] = inode_path['path']
                 if inode_path['path'] != '':
@@ -53,7 +41,7 @@ class QumuloActivitySqlite(object):
 
     def process_path_data(self, tree):
         result_count = 0
-        cn = sqlite3.connect(self.get_db())
+        cn = sqlite3.connect(self.db.get_db())
         cur = cn.cursor()
         ts = int(math.floor(time.time() / 3600) * 3600)
         cur.execute('SELECT * FROM iops_tput_path_hour WHERE ts=?', (ts, ))
@@ -83,7 +71,7 @@ class QumuloActivitySqlite(object):
 
 
     def process_client_ip_data(self, tree):
-        cn = sqlite3.connect(self.get_db())
+        cn = sqlite3.connect(self.db.get_db())
         cur = cn.cursor()
         ts = int(math.floor(time.time() / 3600) * 3600)
         cur.execute('SELECT * FROM iops_tput_client_ip_hour WHERE ts=?', (ts, ))
@@ -131,22 +119,7 @@ class QumuloActivitySqlite(object):
         cn.close()
 
 
-    def create_table(self, name, cols):
-        db_file_name = self.get_db()
-        cn = sqlite3.connect(db_file_name)
-        cur = cn.cursor()
-        sql = """SELECT name FROM sqlite_master 
-                WHERE type='table' 
-                AND name='%s'""" % (name, )
-        cur.execute(sql)
-        rows = cur.fetchall()
-        if len(rows) == 0:
-            cur.execute('''CREATE TABLE %s(%s)''' % (name, cols))
-            cn.commit()
-        cn.close()
-
-
-    def create_db(self):
+    def create_tables(self):
         iops_tput_path_hour_cols = """
                  ts INT,
                  ts_latest REAL,
@@ -160,7 +133,7 @@ class QumuloActivitySqlite(object):
                  write_iops INTEGER,
                  total_iops INTEGER
                 """
-        self.create_table("iops_tput_path_hour", iops_tput_path_hour_cols)
+        self.db.create_table("iops_tput_path_hour", iops_tput_path_hour_cols)
 
         iops_tput_client_ip_hour_cols = """
                  ts INT,
@@ -176,5 +149,4 @@ class QumuloActivitySqlite(object):
                  write_iops INTEGER,
                  total_iops INTEGER
                 """
-        self.create_table("iops_tput_client_ip_hour", iops_tput_client_ip_hour_cols)
-
+        self.db.create_table("iops_tput_client_ip_hour", iops_tput_client_ip_hour_cols)

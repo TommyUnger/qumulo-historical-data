@@ -4,8 +4,9 @@ import sys
 import json
 import time
 import subprocess
-from qumulo_activity_sqlite import QumuloActivitySqlite
-from qumulo_activity_tree import Node, NodeHelper
+from qumulo_api_sqlite import QumuloApiSqlite
+from activity_tree import Node, NodeHelper
+from api_activity import ApiActivity
 
 full_path = os.path.abspath(__file__)
 working_directory = os.path.dirname(full_path)
@@ -13,7 +14,7 @@ working_directory = os.path.dirname(full_path)
 def setup_cron():
     import qumulo
     python_path = "export PYTHONPATH=$PYTHONPATH:" + re.sub('/qumulo$', '', os.path.dirname(qumulo.__file__))
-    cron_cmd = "*/2 * * * * %s; cd %s; python %s get_data >> log_qumulo_activity.txt 2>&1" % (python_path, working_directory, __file__)
+    cron_cmd = "*/2 * * * * %s; cd %s; python %s get_activity_data >> log_get_activity_data.txt 2>&1" % (python_path, working_directory, __file__)
     cron_data = subprocess.check_output("crontab -l", shell=True)
     crons = cron_data.split("\n")
     cronjob_exists = False
@@ -37,7 +38,7 @@ def main():
 
     config_file = 'config.json'
     if len(sys.argv) < 2:
-        print("Please specify an argument (add_cron or get_data).")
+        print("Please specify an argument (add_cron or get_activity_data).")
         sys.exit()
     cmd = sys.argv[1]
 
@@ -54,18 +55,19 @@ def main():
 
     if cmd == 'create_db':
         for cluster in config['clusters']:
-            q_activity = QumuloActivitySqlite(cluster, db_path)
-            q_activity.create_db()
+            q_api = QumuloApiSqlite(cluster, db_path)
+            q_api.setup_tables()
     elif cmd == 'add_cron':
         print("Add data pull to crontab. Will run every 2 minutes.")
         setup_cron()
-    elif cmd == 'get_data':
+    elif cmd == 'get_activity_data':
         print("Pulling data at time: %s" % (time.strftime("%Y-%m-%d %H:%M:%S"),))
         for cluster in config['clusters']:
-            q_activity = QumuloActivitySqlite(cluster, db_path)
-            q_activity.create_db()
+            q_api = QumuloApiSqlite(cluster, db_path)
+            q_api.setup_tables()
             start_time = time.time()
             tree = Node({'name':'/'})
+            q_activity = ApiActivity(q_api)
             activity = q_activity.get_activity()
             for i, entry in enumerate(activity['data']):
                 if entry['id'] in activity['inode_paths']:
