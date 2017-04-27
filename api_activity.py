@@ -28,7 +28,6 @@ class ApiActivity(object):
 
     def update_inode_cache(self, inode, path):
         if inode in self.inode_cache:
-            self.inode_cache[inode][2] = int(time.time())
             self.inode_cache[inode][2] += 1
         else:
             self.inode_cache[inode] = [inode, path, time.time(), 1]
