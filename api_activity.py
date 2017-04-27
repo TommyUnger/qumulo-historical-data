@@ -9,7 +9,6 @@ from activity_tree import NodeHelper
 class ApiActivity(object):
     db = None
     inode_cache = {}
-    new_inode_cache = []
 
     def __init__(self, db):
         self.db = db
@@ -17,39 +16,54 @@ class ApiActivity(object):
 
     def setup_inode_cache(self):
         cn = sqlite3.connect(self.db.get_db())
+        cn.execute("DELETE FROM inode_path_lookup WHERE update_time < %s" % (int(time.time() - 600)))
+        cn.commit()
+        sql = "SELECT inode, path, update_time, update_count FROM inode_path_lookup"
         cur = cn.cursor()
-        sql = "SELECT inode, path FROM inode_path_lookup"
         cur.execute(sql)
         for row in cur.fetchall():
-            self.inode_cache[int(row[0])] = row[1]
+            self.inode_cache[int(row[0])] = [a for a in row]
         cn.close()
 
 
-    def add_inode_path(self, inode, path):
-        self.new_inode_cache.append([inode, path, time.time(), 1])
+    def update_inode_cache(self, inode, path):
+        if inode in self.inode_cache:
+            self.inode_cache[inode][2] = int(time.time())
+            self.inode_cache[inode][2] += 1
+        else:
+            self.inode_cache[inode] = [inode, path, time.time(), 1]
 
-    def add_to_cache(self):
+
+    def insert_cache_into_db(self):
         cn = sqlite3.connect(self.db.get_db())
-        # cn.execute("DELETE FROM iops_tput_path_hour WHERE ts=?", (ts, ))
-        cn.executemany("insert into inode_path_lookup values (?,?,?,?)", self.new_inode_cache)
+        cn.execute("DELETE FROM inode_path_lookup")
+        cn.executemany("insert into inode_path_lookup values (?,?,?,?)", self.inode_cache.values())
         cn.commit()
         cn.close()
+
 
     # api wrappers
     def get_activity(self):
         activity = self.db.rc.analytics.current_activity_get()
         inode_paths = {}
         self.setup_inode_cache()
-        print "Cachse size: %s" % (len(self.inode_cache))
+        print "Cache size: %s" % (len(self.inode_cache))
         inode_ids = {}
+        activity_by_id = {}
+
         for entry in activity['entries']:
-            if int(entry['id']) in self.inode_cache:
-                inode_paths[entry['id']] = self.inode_cache[int(entry['id'])]
+            inode = int(entry['id'])
+            if inode not in activity_by_id:
+                activity_by_id[inode] = []
+            activity_by_id[inode].append(entry)
+            if inode in self.inode_cache:
+                self.update_inode_cache(inode, self.inode_cache[int(entry['id'])])
+                inode_paths[inode] = self.inode_cache[int(entry['id'])]
             else:
-                if entry['id'] not in inode_ids:
-                    inode_ids[entry['id']] = 1
+                if inode not in inode_ids:
+                    inode_ids[inode] = 1
                 else:
-                    inode_ids[entry['id']] += 1
+                    inode_ids[inode] += 1
 
         inode_ids = inode_ids.keys()
         lookup_count = len(inode_ids)
@@ -57,14 +71,16 @@ class ApiActivity(object):
         print "Found count: %s" % (len(inode_paths), )
         print "Lookup count: %s" % (lookup_count, )
         while len(inode_ids) > 0:
-            path_ids = self.db.rc.fs.resolve_paths(inode_ids[:400])
+            path_ids = self.db.rc.fs.resolve_paths([str(d) for d in inode_ids[:400]])
             for inode_path in path_ids:
-                inode_paths[inode_path['id']] = inode_path['path']
+                inode = int(inode_path['id'])
+                inode_paths[inode] = inode_path['path']
                 if inode_path['path'] != '':
                     found_count += 1
-                    self.add_inode_path(inode_path['id'], inode_path['path'])
+                self.update_inode_cache(inode, inode_path['path'])
+
             del inode_ids[:400]
-        self.add_to_cache()
+        self.insert_cache_into_db()
         return {"data": activity['entries'], "inode_paths":inode_paths}
 
 
