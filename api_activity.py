@@ -8,11 +8,11 @@ from activity_tree import NodeHelper
 
 class ApiActivity(object):
     db = None
-    inode_cache = {}
+    inode_cache = None
 
     def __init__(self, db):
         self.db = db
-
+        self.inode_cache = {}
 
     def setup_inode_cache(self):
         cn = sqlite3.connect(self.db.get_db())
@@ -40,13 +40,11 @@ class ApiActivity(object):
         cn.commit()
         cn.close()
 
-
     # api wrappers
     def get_activity(self):
         activity = self.db.rc.analytics.current_activity_get()
         inode_paths = {}
         self.setup_inode_cache()
-        print "Cache size: %s" % (len(self.inode_cache))
         inode_ids = {}
         activity_by_id = {}
 
@@ -67,8 +65,6 @@ class ApiActivity(object):
         inode_ids = inode_ids.keys()
         lookup_count = len(inode_ids)
         found_count = 0
-        print "Found count: %s" % (len(inode_paths), )
-        print "Lookup count: %s" % (lookup_count, )
         while len(inode_ids) > 0:
             path_ids = self.db.rc.fs.resolve_paths([str(d) for d in inode_ids[:400]])
             for inode_path in path_ids:

@@ -7,6 +7,8 @@ import subprocess
 from qumulo_api_sqlite import QumuloApiSqlite
 from activity_tree import Node, NodeHelper
 from api_activity import ApiActivity
+from api_capacity import ApiCapacity
+
 
 full_path = os.path.abspath(__file__)
 working_directory = os.path.dirname(full_path)
@@ -56,7 +58,6 @@ def main():
     if cmd == 'create_db':
         for cluster in config['clusters']:
             q_api = QumuloApiSqlite(cluster, db_path)
-            q_api.setup_tables()
     elif cmd == 'add_cron':
         print("Add data pull to crontab. Will run every 2 minutes.")
         setup_cron()
@@ -64,7 +65,6 @@ def main():
         print("Pulling data at time: %s" % (time.strftime("%Y-%m-%d %H:%M:%S"),))
         for cluster in config['clusters']:
             q_api = QumuloApiSqlite(cluster, db_path)
-            q_api.setup_tables()
             start_time = time.time()
             tree = Node({'name':'/'})
             q_activity = ApiActivity(q_api)
@@ -79,7 +79,14 @@ def main():
                     parts = ['', entry['ip']] + activity['inode_paths'][entry['id']].split('/')[1:]
                     NodeHelper.add_path_and_data_to_tree(tree, parts, entry)
             q_activity.process_client_ip_data(tree)
-            print("%5s seconds for: %s" % (round(time.time() - start_time, 2), cluster['cluster']))
+            print("%5s seconds for cluster: %s" % (round(time.time() - start_time, 2), cluster['cluster']))
+    elif cmd == 'get_capacity_data':
+        for cluster in config['clusters']:
+            print("Get capacity data for cluster: %s" % (cluster['cluster'],))
+            q_api = QumuloApiSqlite(cluster, db_path)
+            q_capacity = ApiCapacity(q_api)
+            q_capacity.get_capacity_sampled()
+
 
 
 if __name__ == "__main__":

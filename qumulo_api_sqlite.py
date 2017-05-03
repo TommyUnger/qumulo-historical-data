@@ -5,6 +5,8 @@ import time
 import sqlite3
 from qumulo.rest_client import RestClient
 from api_activity import ApiActivity
+from api_capacity import ApiCapacity
+
 
 class QumuloApiSqlite(object):
     rc = None
@@ -16,6 +18,7 @@ class QumuloApiSqlite(object):
         self.db_path = db_path
         self.rc = RestClient(cluster['cluster'], 8000)
         self.rc.login(cluster['user'], cluster['pass'])
+        self.setup_tables()
 
 
     def get_db(self):
@@ -40,3 +43,5 @@ class QumuloApiSqlite(object):
     def setup_tables(self):
         q_activity = ApiActivity(self)
         q_activity.create_tables()
+        q_capacity = ApiCapacity(self)
+        q_capacity.create_tables()
