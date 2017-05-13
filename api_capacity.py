@@ -12,7 +12,7 @@ class ApiCapacity(object):
 
     def get_capacity_sampled(self):
         start_time = time.time()
-        samples = self.db.rc.fs.get_file_samples("/", 100, "capacity")
+        samples = self.db.rc.fs.get_file_samples("/", 20, "capacity")
         data = []
         for d in samples:
             try:
