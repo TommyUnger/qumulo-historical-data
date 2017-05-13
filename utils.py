@@ -1,3 +1,5 @@
+import re
+from datetime import datetime as dt
 
 def flatten_to_array(d, parent_key='', sep='_'):
     items = []
@@ -28,3 +30,7 @@ def flatten_to_array(d, parent_key='', sep='_'):
         else:
             items.append((new_key, v))
     return dict(items)
+
+
+def date_to_ts(d):
+    return (dt.strptime(re.sub("[.Z].*", "", d), "%Y-%m-%dT%H:%M:%S")).strftime('%s')

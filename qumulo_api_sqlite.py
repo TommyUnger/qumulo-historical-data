@@ -14,15 +14,22 @@ class QumuloApiSqlite(object):
     db_path = None
 
     def __init__(self, cluster, db_path):
+        seconds_in_day = 60 * 60 * 24
         self.cluster = cluster
         self.db_path = db_path
         self.rc = RestClient(cluster['cluster'], 8000)
         self.rc.login(cluster['user'], cluster['pass'])
+        week_time = time.gmtime(math.floor((time.time()) / (seconds_in_day * 7)) * (seconds_in_day * 7) - seconds_in_day*4)
+        ts_week = time.strftime("%Y-%m-%d", week_time)
+        db_dir = '%s/%s' % (self.db_path, self.cluster['cluster'])
+        if not os.path.exists(db_dir):
+            os.mkdir(db_dir)
+        self.db_path = '%s/%s-qumulo-api-data.db' % (db_dir, ts_week)
         self.setup_tables()
 
 
     def get_db(self):
-        return '%s/qumulo-api-data-%s.db' % (self.db_path, self.cluster['cluster'])
+        return self.db_path
 
 
     def create_table(self, name, cols):
