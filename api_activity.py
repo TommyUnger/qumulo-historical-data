@@ -55,7 +55,7 @@ class ApiActivity(object):
             activity_by_id[inode].append(entry)
             if inode in self.inode_cache:
                 self.update_inode_cache(inode, self.inode_cache[int(entry['id'])])
-                inode_paths[inode] = self.inode_cache[int(entry['id'])]
+                inode_paths[inode] = self.inode_cache[int(entry['id'])][1]
             else:
                 if inode not in inode_ids:
                     inode_ids[inode] = 1

@@ -39,13 +39,15 @@ def get_activity_data(cluster, db_path):
     q_activity = ApiActivity(q_api)
     activity = q_activity.get_activity()
     for i, entry in enumerate(activity['data']):
-        if entry['id'] in activity['inode_paths']:
-            NodeHelper.add_path_and_data_to_tree(tree, activity['inode_paths'][entry['id']].split('/'), entry)
+        inode_id = int(entry['id'])
+        if inode_id in activity['inode_paths']:
+            NodeHelper.add_path_and_data_to_tree(tree, activity['inode_paths'][inode_id].split('/'), entry)
     q_activity.process_path_data(tree)
     tree = Node({'name':'/'})
     for i, entry in enumerate(activity['data']):
-        if entry['id'] in activity['inode_paths']:
-            parts = ['', entry['ip']] + activity['inode_paths'][entry['id']].split('/')[1:]
+        inode_id = int(entry['id'])
+        if inode_id in activity['inode_paths']:
+            parts = ['', entry['ip']] + activity['inode_paths'][inode_id].split('/')[1:]
             NodeHelper.add_path_and_data_to_tree(tree, parts, entry)
     q_activity.process_client_ip_data(tree)
     print("%.2f seconds for cluster activity: %s" % (round(time.time() - start_time, 2), cluster['cluster']))
@@ -105,7 +107,7 @@ def main():
 
         for result in results:
             try:
-                result.get(timeout=120)
+                result.get(timeout=200)
             except:
                 print("Unable to get data.")
 
