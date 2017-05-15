@@ -19,7 +19,10 @@ class QumuloApiSqlite(object):
         self.db_path = db_path
         self.rc = RestClient(cluster['cluster'], 8000)
         self.rc.login(cluster['user'], cluster['pass'])
-        week_time = time.gmtime(math.floor((time.time()) / (seconds_in_day * 7)) * (seconds_in_day * 7) - seconds_in_day*4)
+        round_ts = math.floor((time.time()-seconds_in_day*3)
+                    / (seconds_in_day * 7)) * (seconds_in_day * 7) \
+                    + seconds_in_day * 3
+        week_time = time.gmtime(round_ts)
         ts_week = time.strftime("%Y-%m-%d", week_time)
         db_dir = '%s/%s' % (self.db_path, self.cluster['cluster'])
         if not os.path.exists(db_dir):
