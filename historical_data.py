@@ -4,11 +4,12 @@ import sys
 import json
 import time
 import subprocess
+import traceback
 from qumulo_api_sqlite import QumuloApiSqlite
 from activity_tree import Node, NodeHelper
 from api_activity import ApiActivity
 from api_capacity import ApiCapacity
-from multiprocessing import Pool
+from multiprocessing import Pool, Lock
 
 
 full_path = os.path.abspath(__file__)
@@ -32,36 +33,75 @@ def setup_cron():
         print("Crontab is already installed: %s" % (cronjob_exists,))
 
 
+def init(l):
+    global lock
+    lock = l
+
+
 def get_activity_data(cluster, db_path):
-    start_time = time.time()
-    q_api = QumuloApiSqlite(cluster, db_path)
-    tree = Node({'name':'/'})
-    q_activity = ApiActivity(q_api)
-    activity = q_activity.get_activity()
-    for i, entry in enumerate(activity['data']):
-        inode_id = int(entry['id'])
-        if inode_id in activity['inode_paths']:
-            NodeHelper.add_path_and_data_to_tree(tree, activity['inode_paths'][inode_id].split('/'), entry)
-    q_activity.process_path_data(tree)
-    tree = Node({'name':'/'})
-    for i, entry in enumerate(activity['data']):
-        inode_id = int(entry['id'])
-        if inode_id in activity['inode_paths']:
-            parts = ['', entry['ip']] + activity['inode_paths'][inode_id].split('/')[1:]
-            NodeHelper.add_path_and_data_to_tree(tree, parts, entry)
-    q_activity.process_client_ip_data(tree)
-    print("%.2f seconds for cluster activity: %s" % (round(time.time() - start_time, 2), cluster['cluster']))
+    try:
+        start_time = time.time()
+        q_api = QumuloApiSqlite(cluster, db_path)
+        q_activity = ApiActivity(q_api)
+        activity = q_activity.get_activity()
+
+        # paths        
+        tree = Node({'name':'/'})
+        for i, entry in enumerate(activity['data']):
+            inode_id = int(entry['id'])
+            if inode_id in activity['inode_paths']:
+                NodeHelper.add_path_and_data_to_tree(tree, activity['inode_paths'][inode_id].split('/'), entry)
+        q_activity.process_path_data(tree)
+
+        # client ip addresses
+        tree = Node({'name':'/'})
+        for i, entry in enumerate(activity['data']):
+            inode_id = int(entry['id'])
+            if inode_id in activity['inode_paths']:
+                parts = ['', entry['ip']] + activity['inode_paths'][inode_id].split('/')[1:]
+                NodeHelper.add_path_and_data_to_tree(tree, parts, entry)
+        q_activity.process_client_ip_data(tree)
+
+        lock.acquire()
+        print("%.2f seconds for cluster activity: %s" % (round(time.time() - start_time, 2), cluster['cluster']))
+        lock.release()
+    except Exception, e:
+        type_, value_, traceback_ = sys.exc_info()
+        lock.acquire()
+        print("*********************          Data/API Exception          *********************")
+        print("*   %-72s   *" % ("Unable to get activity data",))
+        print("*   Cluster: %(cluster)-20s,    user: %(user)-32s   *" % cluster)
+        print("*   %-72s   *" % (type_,))
+        print("*   %-72s   *" % (value_,))
+        print("*" * 80)
+        print("")
+        lock.release()
 
 
 def get_capacity_data(cluster, db_path):
-    start_time = time.time()
-    q_api = QumuloApiSqlite(cluster, db_path)
-    q_capacity = ApiCapacity(q_api)
-    q_capacity.get_capacity_sampled()
-    print("%.2f seconds for cluster capacity: %s" % (round(time.time() - start_time, 2), cluster['cluster']))
+    try:
+        start_time = time.time()
+        q_api = QumuloApiSqlite(cluster, db_path)
+        q_capacity = ApiCapacity(q_api)
+        q_capacity.get_capacity_sampled()
+        lock.acquire()
+        print("%.2f seconds for cluster capacity: %s" % (round(time.time() - start_time, 2), cluster['cluster']))
+        lock.release()
+    except Exception, e:
+        type_, value_, traceback_ = sys.exc_info()
+        lock.acquire()
+        print("*********************          Data/API Exception          *********************")
+        print("*   %-72s   *" % ("Unable to get activity data",))
+        print("*   Cluster: %(cluster)-20s,    user: %(user)-32s   *" % cluster)
+        print("*   %-72s   *" % (type_,))
+        print("*   %-72s   *" % (value_,))
+        print("*" * 80)
+        print("")
+        lock.release()
 
 
 def main():
+    l = Lock()
     try:
         import qumulo
     except:
@@ -70,7 +110,7 @@ def main():
 
     config_file = 'config.json'
     if len(sys.argv) < 2:
-        print("Please specify an argument (add_cron or get_activity_data).")
+        print("Please specify an argument (add_cron, get_activity_data, or get_capacity_data).")
         sys.exit()
     cmds = sys.argv[1:]
 
@@ -91,10 +131,9 @@ def main():
     elif 'add_cron' in cmds:
         print("Add data pull to crontab. Will run every 2 minutes.")
         setup_cron()
-
     else:
         results = []
-        pool = Pool(processes=4) 
+        pool = Pool(processes=4, initializer=init, initargs=(l,)) 
         if 'get_activity_data' in cmds:
             print("Pulling activity data at time: %s" % (time.strftime("%Y-%m-%d %H:%M:%S"),))
             for cluster in config['clusters']:
@@ -106,10 +145,7 @@ def main():
                 results.append(pool.apply_async(get_capacity_data, (cluster, db_path)))
 
         for result in results:
-            try:
-                result.get(timeout=200)
-            except:
-                print("Unable to get data.")
+            result.get(timeout=200)
 
 
 

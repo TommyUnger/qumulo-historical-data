@@ -38,6 +38,10 @@ class NodeHelper(object):
                 node.heats[data['type']] = 0
             node.heats[data['type']] += data['rate']
             NodeHelper.add_path_and_data_to_tree(node.get_child_by_name(part), parts, data)
+        else:
+            if data['type'] not in node.heats:
+                node.heats[data['type']] = 0
+            node.heats[data['type']] += data['rate']
 
     @staticmethod
     def iternodes(node):
@@ -73,6 +77,6 @@ class NodeHelper(object):
             if (data["total_data"] > 10000 or data["total_iops"] > 5):
                 yield data
         for name,child in node.children.iteritems():
-            if level < max_level:
+            if level <= max_level:
                 for rn in NodeHelper.walk_tree(ts, parent_path + node.name + ('/' if level > 1 else ''), child, level+1, max_level):
                     yield rn

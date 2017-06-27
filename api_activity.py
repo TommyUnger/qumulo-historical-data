@@ -92,7 +92,7 @@ class ApiActivity(object):
             for i, col_name in enumerate(col_names):
                 all_data[current_data[2]][col_name] = current_data[i]
 
-        for new_data in NodeHelper.walk_tree(ts, '', tree, max_level=4):
+        for new_data in NodeHelper.walk_tree(ts, '', tree, max_level=6):
             if new_data['path'] in all_data:
                 for i, col_name in enumerate(col_names):
                     if i > 3:
