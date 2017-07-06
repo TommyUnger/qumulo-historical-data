@@ -15,7 +15,7 @@ To install and run:
 2. Set up your config.json with your cluster(s) Qumulo API credentials. And *absolute* destination path for your sqlite database(s).
 3. run `python historical_data.py add_cron`
 4. After you've been collecting data for a few hours, or a few days, or more. 
-    a. run `jupyter-notebook`
-    b. Open the URL output by jupyter-notebook in your browser.
-    c. Navigate to notebooks/Capacity_with_activity.ipynb
-    d. Run each of the code blocks (press "Shift-Enter"). Note that you'll need to change the last block to specify your cluster name.
+    1. run `jupyter-notebook`
+    2. Open the URL output by jupyter-notebook in your browser.
+    3. Navigate to notebooks/Capacity_with_activity.ipynb
+    4. Run each of the code blocks (press "Shift-Enter"). Note that you'll need to change the last block to specify your cluster name.
